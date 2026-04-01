@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"errors"
@@ -63,7 +63,6 @@ func TestClientDigestTick(t *testing.T) {
 
 	c.CaptureError(errors.New("tick test"))
 
-	// Wait for the digest interval to fire (~50ms) plus a small buffer.
 	time.Sleep(200 * time.Millisecond)
 
 	if rec.digestCount() == 0 {
@@ -87,7 +86,6 @@ func TestClientShutdownFlush(t *testing.T) {
 
 func TestClientBeforeSendFilter(t *testing.T) {
 	c, rec := newTestClient()
-	// Drop all events via BeforeSend.
 	c.cfg.BeforeSend = func(e *Event) *Event { return nil }
 	c.Start()
 	defer c.Shutdown(5 * time.Second)
@@ -147,10 +145,8 @@ func TestClientImmediateOnFirst(t *testing.T) {
 	defer c.Shutdown(5 * time.Second)
 
 	c.CaptureError(errors.New("brand new error"))
-	// Send again — should NOT trigger a second immediate.
 	c.CaptureError(errors.New("brand new error"))
 
-	// Give the goroutine time to send the immediate.
 	time.Sleep(100 * time.Millisecond)
 
 	if rec.immediateCount() != 1 {
@@ -160,10 +156,8 @@ func TestClientImmediateOnFirst(t *testing.T) {
 
 func TestClientDropsWhenBufferFull(t *testing.T) {
 	c, _ := newTestClient()
-	// Make the buffer tiny so it fills up quickly.
 	c.cfg.BufferSize = 2
 	c.events = make(chan *Event, 2)
-	// Do NOT start the event loop — events will just pile up in the buffer.
 
 	for i := 0; i < 10; i++ {
 		c.sendEvent(&Event{Timestamp: time.Now(), Error: "overflow"})

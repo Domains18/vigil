@@ -1,4 +1,4 @@
-package vigil
+package core
 
 // Severity represents the level of an error event.
 type Severity int

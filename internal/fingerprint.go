@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"crypto/sha256"
@@ -63,7 +63,7 @@ func normalizeFunction(fn string) string {
 }
 
 // NormalizePath replaces UUID and numeric path segments with ":id".
-// Exported so middleware and templates can use it for display.
+// Exported so middleware adapters and templates can use it for display.
 func NormalizePath(path string) string {
 	path = reUUID.ReplaceAllString(path, ":id")
 	path = reNumeric.ReplaceAllString(path, "/:id")

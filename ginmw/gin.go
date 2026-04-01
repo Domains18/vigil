@@ -22,10 +22,11 @@ var sensitiveHeaders = map[string]bool{
 }
 
 // Middleware returns a Gin handler that captures panics and 5xx responses.
-// Register it before gin.Recovery() so panics are observed before being swallowed.
+// Register it AFTER gin.Recovery() so Vigil's deferred recovery fires first
+// (Go defers are LIFO), observes the panic, re-panics, then Recovery handles the 500.
 //
-//	r.Use(ginmw.Middleware(client))
 //	r.Use(gin.Recovery())
+//	r.Use(ginmw.Middleware(client))
 func Middleware(client *vigil.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if client == nil {

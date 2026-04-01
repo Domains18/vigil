@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"errors"
@@ -35,7 +35,7 @@ type Config struct {
 	MaxStackDepth int // default: 32 (frames to capture)
 
 	// Extensibility
-	Notifier   Notifier           // optional — overrides SMTP notifier
+	Notifier   Notifier            // optional — overrides SMTP notifier
 	BeforeSend func(*Event) *Event // optional — modify or filter events (return nil to drop)
 }
 

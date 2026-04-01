@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"context"
@@ -42,7 +42,7 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, err
 	}
 	if cfg.Notifier == nil {
-		cfg.Notifier = newSMTPNotifier(cfg.SMTP, cfg.Recipients)
+		cfg.Notifier = NewSMTPNotifier(cfg.SMTP, cfg.Recipients)
 	}
 	return &Client{
 		cfg:      cfg,
@@ -219,7 +219,6 @@ func (c *Client) loop() {
 	rateLimitCount := 0
 
 	processEvent := func(event *Event) {
-		// Rate limiting
 		now := event.Timestamp
 		if rateLimitWindowStart.IsZero() || now.Sub(rateLimitWindowStart) > time.Minute {
 			rateLimitWindowStart = now
@@ -249,7 +248,6 @@ func (c *Client) loop() {
 		if len(groups) == 0 {
 			return nil
 		}
-		// Sort by count descending for the most impactful errors first.
 		sort.Slice(groups, func(i, j int) bool {
 			return groups[i].Count > groups[j].Count
 		})
@@ -285,7 +283,6 @@ func (c *Client) loop() {
 			dedup.evict(now)
 
 		case replyCh := <-c.flushReq:
-			// Drain any pending buffered events before flushing.
 		drainLoop:
 			for {
 				select {
@@ -298,7 +295,6 @@ func (c *Client) loop() {
 			replyCh <- sendDigest(time.Now())
 
 		case <-c.stop:
-			// Drain remaining buffered events, then send final digest.
 		shutdownDrain:
 			for {
 				select {

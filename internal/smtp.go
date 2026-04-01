@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"bytes"
@@ -17,8 +17,9 @@ type SMTPNotifier struct {
 	recipients []string
 }
 
-// newSMTPNotifier creates an SMTP notifier from config.
-func newSMTPNotifier(cfg SMTPConfig, recipients []string) *SMTPNotifier {
+// NewSMTPNotifier creates an SMTP notifier from config and recipients list.
+// Exported so users can create one explicitly when using NewClient.
+func NewSMTPNotifier(cfg SMTPConfig, recipients []string) *SMTPNotifier {
 	return &SMTPNotifier{cfg: cfg, recipients: recipients}
 }
 

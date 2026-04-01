@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"testing"
@@ -6,14 +6,13 @@ import (
 )
 
 func TestFingerprintStability(t *testing.T) {
-	// Same error type + same stack = same fingerprint, regardless of line numbers.
 	frames := []Frame{
 		{Function: "github.com/example/app/services.(*MetaClient).SendMessage", File: "services/meta.go", Line: 142},
 		{Function: "github.com/example/app/services.(*WebhookService).ReceiveWebhook", File: "services/webhook.go", Line: 88},
 		{Function: "github.com/example/app/handlers.(*WebhookHandler).Handle", File: "handlers/webhook.go", Line: 55},
 	}
 	framesShifted := []Frame{
-		{Function: "github.com/example/app/services.(*MetaClient).SendMessage", File: "services/meta.go", Line: 145}, // line changed
+		{Function: "github.com/example/app/services.(*MetaClient).SendMessage", File: "services/meta.go", Line: 145},
 		{Function: "github.com/example/app/services.(*WebhookService).ReceiveWebhook", File: "services/webhook.go", Line: 91},
 		{Function: "github.com/example/app/handlers.(*WebhookHandler).Handle", File: "handlers/webhook.go", Line: 58},
 	}
@@ -54,7 +53,6 @@ func TestFingerprintManualOverride(t *testing.T) {
 }
 
 func TestFingerprintHTTPRequest(t *testing.T) {
-	// Events with no stack should use HTTP request info.
 	e := &Event{
 		Request: &RequestInfo{
 			Method:     "POST",
@@ -68,7 +66,6 @@ func TestFingerprintHTTPRequest(t *testing.T) {
 		t.Error("fingerprint should not be empty")
 	}
 
-	// A different numeric ID should yield the same fingerprint (path normalized).
 	e2 := &Event{
 		Request: &RequestInfo{
 			Method:     "POST",

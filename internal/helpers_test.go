@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"context"

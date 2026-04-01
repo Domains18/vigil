@@ -1,4 +1,4 @@
-package vigil
+package core
 
 import (
 	"testing"
@@ -67,12 +67,10 @@ func TestDedupDrainGroups(t *testing.T) {
 	if countByFP["fp2"] != 1 {
 		t.Errorf("fp2 count: got %d, want 1", countByFP["fp2"])
 	}
-	// First drain: both should be new.
 	if !isNewByFP["fp1"] || !isNewByFP["fp2"] {
 		t.Error("first drain: all groups should be IsNew=true")
 	}
 
-	// After drain, counts are reset.
 	d.record(&Event{Fingerprint: "fp1", Timestamp: now.Add(2 * time.Second)})
 	groups2 := d.drainGroups()
 	if len(groups2) != 1 {
@@ -89,7 +87,6 @@ func TestDedupEviction(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Millisecond)
 	d.record(&Event{Fingerprint: "old", Timestamp: past})
-	// Manually set lastSeen to past so eviction fires.
 	d.entries["old"].lastSeen = past
 
 	d.record(&Event{Fingerprint: "new", Timestamp: time.Now()})
@@ -111,11 +108,10 @@ func TestDedupEvictedEntryTreatedAsNew(t *testing.T) {
 	past := time.Now().Add(-200 * time.Millisecond)
 	d.record(&Event{Fingerprint: "fp", Timestamp: past})
 	d.entries["fp"].lastSeen = past
-	d.entries["fp"].everSeen = true // simulate it was seen in a prior window
+	d.entries["fp"].everSeen = true
 
 	d.evict(time.Now())
 
-	// After eviction, isNew should return true (treated as a fresh occurrence).
 	if !d.isNew("fp") {
 		t.Error("evicted fingerprint should be treated as new")
 	}

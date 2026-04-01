@@ -126,8 +126,8 @@ func TestMiddlewarePanicCapture(t *testing.T) {
 	client, rec := newTestClient(t)
 
 	r := gin.New()
-	r.Use(ginmw.Middleware(client))
-	r.Use(gin.Recovery()) // must come after Vigil so panic is observed first
+	r.Use(gin.Recovery())            // outermost
+	r.Use(ginmw.Middleware(client))  // innermost — Vigil's defer fires first (LIFO)
 	r.GET("/panic", func(c *gin.Context) {
 		panic("test panic")
 	})
