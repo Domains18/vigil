@@ -51,10 +51,10 @@ vigil/
 The core `vigil` package has **zero dependencies** beyond Go's stdlib. Framework middleware lives in separate subpackages (`ginmw`, `echomw`, `nethttpmw`) so importing Vigil into a net/http app never pulls in Gin or Echo.
 
 ```
-github.com/your-org/vigil              → no external deps
-github.com/your-org/vigil/ginmw        → depends on gin-gonic/gin
-github.com/your-org/vigil/echomw       → depends on labstack/echo/v4
-github.com/your-org/vigil/nethttpmw    → no external deps
+github.com/domains18/vigil              → no external deps
+github.com/domains18/vigil/ginmw        → depends on gin-gonic/gin
+github.com/domains18/vigil/echomw       → depends on labstack/echo/v4
+github.com/domains18/vigil/nethttpmw    → no external deps
 ```
 
 ---
