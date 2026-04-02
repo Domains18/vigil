@@ -11,6 +11,7 @@ A zero-dependency, embeddable Go library for error monitoring. No dashboard, no 
 - **No noise** — digest-based emails batch errors into one message per interval (default: 5 minutes)
 - **Smart deduplication** — same error fires once per digest window with an occurrence count
 - **Fingerprinting** — groups errors by type + call stack, not by message or line number
+- **Email or Slack** — built-in SMTP and Slack webhook notifiers; plug in your own via the `Notifier` interface
 - **No performance impact** — non-blocking channel send; sub-microsecond overhead on the happy path
 - **No external dependencies** — core uses only the Go standard library
 
@@ -79,6 +80,20 @@ func main() {
 }
 ```
 
+### With Slack
+
+```go
+err := vigil.Init(vigil.Config{
+    ServiceName: "my-api",
+    Environment: "production",
+    Slack: vigil.SlackConfig{
+        WebhookURL: os.Getenv("SLACK_WEBHOOK"),
+        Channel:    "#alerts",
+    },
+    IgnorePaths: []string{"/health", "/metrics"},
+})
+```
+
 ## Email Digest
 
 Vigil batches errors into a single email per digest interval:
@@ -124,7 +139,7 @@ vigil.Config{
     // Optional
     Version: "v1.2.3",
 
-    // SMTP (required unless a custom Notifier is provided)
+    // SMTP delivery (use SMTP or Slack, not both)
     SMTP: vigil.SMTPConfig{
         Host:     "smtp.gmail.com",
         Port:     587,       // 587 = STARTTLS, 465 = implicit TLS
@@ -134,6 +149,13 @@ vigil.Config{
         UseTLS:   false,     // false = STARTTLS (port 587)
     },
     Recipients: []string{"team@example.com"},
+
+    // Slack delivery (alternative to SMTP)
+    Slack: vigil.SlackConfig{
+        WebhookURL: os.Getenv("SLACK_WEBHOOK"), // https://hooks.slack.com/services/...
+        Channel:    "#alerts",                  // optional — override webhook default
+        Username:   "vigil",                    // optional — override webhook default
+    },
 
     // Behavior
     DigestInterval:   5 * time.Minute, // how often to send digest emails
@@ -183,23 +205,23 @@ vigil.CaptureMessage("cache miss rate exceeded threshold", vigil.SeverityWarning
 
 ## Custom Notifier
 
-Implement `vigil.Notifier` to send alerts via Slack, PagerDuty, Discord, or anything else:
+Implement `vigil.Notifier` to send alerts via PagerDuty, Discord, a custom webhook, or anything else:
 
 ```go
-type SlackNotifier struct{ webhookURL string }
+type PagerDutyNotifier struct{ routingKey string }
 
-func (s *SlackNotifier) SendDigest(ctx context.Context, d *vigil.Digest) error {
-    // marshal d to JSON and POST to s.webhookURL
+func (p *PagerDutyNotifier) SendDigest(ctx context.Context, d *vigil.Digest) error {
+    // send a PagerDuty event for the digest
 }
 
-func (s *SlackNotifier) SendImmediate(ctx context.Context, e *vigil.Event) error {
-    // send a single-event alert
+func (p *PagerDutyNotifier) SendImmediate(ctx context.Context, e *vigil.Event) error {
+    // trigger a PagerDuty incident for critical errors
 }
 
 err := vigil.Init(vigil.Config{
     ServiceName: "my-api",
     Environment: "production",
-    Notifier:    &SlackNotifier{webhookURL: os.Getenv("SLACK_WEBHOOK")},
+    Notifier:    &PagerDutyNotifier{routingKey: os.Getenv("PD_ROUTING_KEY")},
 })
 ```
 

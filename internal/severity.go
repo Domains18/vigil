@@ -4,10 +4,10 @@ package core
 type Severity int
 
 const (
-	SeverityInfo    Severity = iota
-	SeverityWarning Severity = iota
-	SeverityError   Severity = iota
-	SeverityFatal   Severity = iota
+	SeverityInfo    Severity = iota // informational; not necessarily an error
+	SeverityWarning                 // something unexpected that may need attention
+	SeverityError                   // a recoverable error
+	SeverityFatal                   // an unrecoverable error or panic
 )
 
 func (s Severity) String() string {
