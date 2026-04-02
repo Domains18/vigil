@@ -3,9 +3,13 @@ module github.com/domains18/vigil/ginmw
 go 1.25.1
 
 require (
-	github.com/domains18/vigil v0.0.0
+	github.com/domains18/vigil v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 )
+
+// replace directive is only for local development.
+// Remove before publishing ginmw/v0.1.0.
+replace github.com/domains18/vigil => ../
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
@@ -39,4 +43,3 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 )
 
-replace github.com/domains18/vigil => ../
