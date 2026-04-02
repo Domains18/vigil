@@ -34,8 +34,11 @@ type Config struct {
 	BufferSize    int // default: 1024 (events channel capacity)
 	MaxStackDepth int // default: 32 (frames to capture)
 
+	// Slack delivery (alternative to SMTP)
+	Slack SlackConfig
+
 	// Extensibility
-	Notifier   Notifier            // optional — overrides SMTP notifier
+	Notifier   Notifier            // optional — overrides SMTP and Slack notifiers
 	BeforeSend func(*Event) *Event // optional — modify or filter events (return nil to drop)
 }
 
@@ -80,17 +83,24 @@ func (c *Config) validate() error {
 		return errors.New("vigil: Environment is required")
 	}
 	if c.Notifier == nil {
-		if len(c.Recipients) == 0 {
-			return errors.New("vigil: Recipients required when no custom Notifier is set")
-		}
-		if c.SMTP.Host == "" {
-			return errors.New("vigil: SMTP.Host required when no custom Notifier is set")
-		}
-		if c.SMTP.Port == 0 {
-			return errors.New("vigil: SMTP.Port required when no custom Notifier is set")
-		}
-		if c.SMTP.From == "" {
-			return errors.New("vigil: SMTP.From required when no custom Notifier is set")
+		hasSlack := c.Slack.WebhookURL != ""
+		hasSMTP := c.SMTP.Host != ""
+
+		switch {
+		case hasSlack:
+			// Slack webhook is self-contained — no extra fields required.
+		case hasSMTP:
+			if len(c.Recipients) == 0 {
+				return errors.New("vigil: Recipients required when using SMTP notifier")
+			}
+			if c.SMTP.Port == 0 {
+				return errors.New("vigil: SMTP.Port required when using SMTP notifier")
+			}
+			if c.SMTP.From == "" {
+				return errors.New("vigil: SMTP.From required when using SMTP notifier")
+			}
+		default:
+			return errors.New("vigil: one of Notifier, Slack.WebhookURL, or SMTP config is required")
 		}
 	}
 	return nil

@@ -139,7 +139,7 @@ func digestSubject(digest *Digest) string {
 
 // immediateSubject builds the email subject for an immediate alert.
 func immediateSubject(event *Event) string {
-	msg := event.Error
+	msg := strings.ReplaceAll(strings.ReplaceAll(event.Error, "\n", " "), "\r", "")
 	if len(msg) > 80 {
 		msg = msg[:80] + "…"
 	}

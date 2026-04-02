@@ -32,7 +32,7 @@ func (n *SMTPNotifier) SendImmediate(ctx context.Context, event *Event) error {
 }
 
 func (n *SMTPNotifier) send(ctx context.Context, subject, body string) error {
-	addr := fmt.Sprintf("%s:%d", n.cfg.Host, n.cfg.Port)
+	addr := net.JoinHostPort(n.cfg.Host, fmt.Sprintf("%d", n.cfg.Port))
 	msg := buildMIMEMessage(n.cfg.From, n.recipients, subject, body)
 	if n.cfg.UseTLS {
 		return n.dialTLS(ctx, addr, msg)
@@ -42,7 +42,7 @@ func (n *SMTPNotifier) send(ctx context.Context, subject, body string) error {
 
 // dialSTARTTLS connects plaintext then upgrades with STARTTLS (port 587 style).
 func (n *SMTPNotifier) dialSTARTTLS(ctx context.Context, addr string, msg []byte) error {
-	host, _, _ := net.SplitHostPort(addr)
+	host := n.cfg.Host
 
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -56,7 +56,7 @@ func (n *SMTPNotifier) dialSTARTTLS(ctx context.Context, addr string, msg []byte
 	defer c.Close()
 
 	if ok, _ := c.Extension("STARTTLS"); ok {
-		if err := c.StartTLS(&tls.Config{ServerName: host}); err != nil {
+		if err := c.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
 			return fmt.Errorf("vigil smtp: starttls: %w", err)
 		}
 	}
@@ -66,13 +66,13 @@ func (n *SMTPNotifier) dialSTARTTLS(ctx context.Context, addr string, msg []byte
 
 // dialTLS connects directly over implicit TLS (port 465 style).
 func (n *SMTPNotifier) dialTLS(ctx context.Context, addr string, msg []byte) error {
-	host, _, _ := net.SplitHostPort(addr)
+	host := n.cfg.Host
 
 	rawConn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("vigil smtp: dial %s: %w", addr, err)
 	}
-	tlsConn := tls.Client(rawConn, &tls.Config{ServerName: host})
+	tlsConn := tls.Client(rawConn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	if err := tlsConn.Handshake(); err != nil {
 		rawConn.Close()
 		return fmt.Errorf("vigil smtp: tls handshake: %w", err)

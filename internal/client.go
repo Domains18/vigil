@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -42,7 +43,12 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, err
 	}
 	if cfg.Notifier == nil {
-		cfg.Notifier = NewSMTPNotifier(cfg.SMTP, cfg.Recipients)
+		switch {
+		case cfg.Slack.WebhookURL != "":
+			cfg.Notifier = NewSlackNotifier(cfg.Slack)
+		default:
+			cfg.Notifier = NewSMTPNotifier(cfg.SMTP, cfg.Recipients)
+		}
 	}
 	return &Client{
 		cfg:      cfg,
@@ -61,24 +67,14 @@ func (c *Client) Start() {
 // ShouldCapture reports whether the given HTTP status code should be captured.
 func (c *Client) ShouldCapture(statusCode int) bool {
 	if len(c.cfg.CaptureStatusCodes) > 0 {
-		for _, code := range c.cfg.CaptureStatusCodes {
-			if code == statusCode {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(c.cfg.CaptureStatusCodes, statusCode)
 	}
 	return statusCode >= 500
 }
 
 // ShouldIgnorePath reports whether the given path should be skipped.
 func (c *Client) ShouldIgnorePath(path string) bool {
-	for _, p := range c.cfg.IgnorePaths {
-		if p == path {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.cfg.IgnorePaths, path)
 }
 
 // CaptureError records an error with an optional set of tags.
@@ -203,6 +199,10 @@ func (c *Client) sendEvent(event *Event) {
 	}
 }
 
+// maxConcurrentImmediate bounds the number of goroutines spawned for
+// ImmediateOnFirst alerts to prevent exhaustion during error storms.
+const maxConcurrentImmediate = 5
+
 // loop is the single background goroutine that owns all mutable state.
 func (c *Client) loop() {
 	defer close(c.done)
@@ -210,6 +210,9 @@ func (c *Client) loop() {
 	dedup := newDedupMap(c.cfg.DeduplicationTTL)
 	ticker := time.NewTicker(c.cfg.DigestInterval)
 	defer ticker.Stop()
+
+	// Semaphore to bound concurrent immediate-alert goroutines.
+	immediateSem := make(chan struct{}, maxConcurrentImmediate)
 
 	periodStart := time.Now()
 	totalEvents := 0
@@ -234,16 +237,22 @@ func (c *Client) loop() {
 		event.Fingerprint = computeFingerprint(event)
 
 		if c.cfg.ImmediateOnFirst && dedup.isNew(event.Fingerprint) {
-			go func(e *Event) {
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				_ = c.cfg.Notifier.SendImmediate(ctx, e)
-			}(event)
+			select {
+			case immediateSem <- struct{}{}:
+				go func(e *Event) {
+					defer func() { <-immediateSem }()
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					_ = c.cfg.Notifier.SendImmediate(ctx, e)
+				}(event)
+			default:
+				// At concurrency limit — skip immediate alert; event still goes into digest.
+			}
 		}
 		dedup.record(event)
 	}
 
-	sendDigest := func(end time.Time) error {
+	buildDigest := func(end time.Time) *Digest {
 		groups := dedup.drainGroups()
 		if len(groups) == 0 {
 			return nil
@@ -265,12 +274,35 @@ func (c *Client) loop() {
 			TotalEvents: totalEvents,
 			Dropped:     int(c.dropped.Swap(0)),
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		err := c.cfg.Notifier.SendDigest(ctx, digest)
 		totalEvents = 0
 		periodStart = end
-		return err
+		return digest
+	}
+
+	// sendDigestSync sends synchronously — used for flush/shutdown where the
+	// caller is waiting for a reply.
+	sendDigestSync := func(end time.Time) error {
+		digest := buildDigest(end)
+		if digest == nil {
+			return nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return c.cfg.Notifier.SendDigest(ctx, digest)
+	}
+
+	// sendDigestAsync sends in a background goroutine so the event loop stays
+	// responsive. Used for periodic ticker-driven digests.
+	sendDigestAsync := func(end time.Time) {
+		digest := buildDigest(end)
+		if digest == nil {
+			return
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = c.cfg.Notifier.SendDigest(ctx, digest)
+		}()
 	}
 
 	for {
@@ -279,7 +311,7 @@ func (c *Client) loop() {
 			processEvent(event)
 
 		case now := <-ticker.C:
-			_ = sendDigest(now)
+			sendDigestAsync(now)
 			dedup.evict(now)
 
 		case replyCh := <-c.flushReq:
@@ -292,7 +324,7 @@ func (c *Client) loop() {
 					break drainLoop
 				}
 			}
-			replyCh <- sendDigest(time.Now())
+			replyCh <- sendDigestSync(time.Now())
 
 		case <-c.stop:
 		shutdownDrain:
@@ -304,7 +336,7 @@ func (c *Client) loop() {
 					break shutdownDrain
 				}
 			}
-			_ = sendDigest(time.Now())
+			_ = sendDigestSync(time.Now())
 			return
 		}
 	}

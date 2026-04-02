@@ -37,7 +37,9 @@ type (
 	ErrorGroup   = core.ErrorGroup
 	Client       = core.Client
 	CaptureInfo  = core.CaptureInfo
-	SMTPNotifier = core.SMTPNotifier
+	SMTPNotifier  = core.SMTPNotifier
+	SlackConfig   = core.SlackConfig
+	SlackNotifier = core.SlackNotifier
 )
 
 // Severity constants.

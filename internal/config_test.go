@@ -73,7 +73,6 @@ func TestConfigValidation(t *testing.T) {
 			mutate: func(c *Config) {
 				c.Notifier = nil
 				c.Recipients = []string{"a@b.com"}
-				c.SMTP = SMTPConfig{Port: 587, From: "x@y.com"}
 			},
 			wantErr: true,
 		},
@@ -83,6 +82,14 @@ func TestConfigValidation(t *testing.T) {
 				c.Notifier = nil
 				c.Recipients = []string{"a@b.com"}
 				c.SMTP = SMTPConfig{Host: "smtp.example.com", Port: 587, From: "a@b.com"}
+			},
+			wantErr: false,
+		},
+		{
+			name: "no notifier, valid slack webhook",
+			mutate: func(c *Config) {
+				c.Notifier = nil
+				c.Slack = SlackConfig{WebhookURL: "https://hooks.slack.com/services/T00/B00/xxx"}
 			},
 			wantErr: false,
 		},
